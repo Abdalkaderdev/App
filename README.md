@@ -1,36 +1,213 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Therapist - Voice-Only Wellness Companion
 
-## Getting Started
+A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated sphere interface. Built with TypeScript, Tailwind CSS, Groq API, and ElevenLabs TTS.
 
-First, run the development server:
+## ⚠️ Disclaimer
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**This is a wellness prototype, not therapy. If in crisis, seek professional help.**
+
+## 🎯 Features
+
+### Voice-Only Interface
+- **Tap-to-speak** - Click the animated sphere to start voice recording
+- **Speech-to-text** - Web Speech API converts voice to text
+- **Text-to-speech** - ElevenLabs generates natural voice responses
+- **No text display** - Pure voice conversation like ChatGPT mobile
+
+### Animated Sphere
+- **ChatGPT-style animations** - Organic morphing sphere with Framer Motion
+- **State-based colors** - Gray (idle), Red (listening), Yellow (thinking), Blue (speaking)
+- **Particle effects** - Floating particles during voice activity
+- **Glow effects** - Dynamic outer glow that expands during activity
+
+### AI Integration
+- **Groq API** - Fast streaming responses with llama-3.1-8b-instant
+- **ElevenLabs TTS** - High-quality voice synthesis
+- **Crisis detection** - Client-side keyword detection with safety alerts
+- **Optimized responses** - Early TTS start for faster perceived response times
+
+### Mobile-First Design
+- **Responsive sphere** - Scales from 64x64 (mobile) to 80x80 (desktop)
+- **Touch-friendly** - Large clickable area with hover/press feedback
+- **Smooth audio** - Mobile Safari and Chrome compatible
+- **Full-screen interface** - Minimal, distraction-free design
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Groq API key ([console.groq.com](https://console.groq.com))
+- ElevenLabs API key ([elevenlabs.io](https://elevenlabs.io))
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Abdalkaderdev/App.git
+   cd App
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.local.example .env.local
+   ```
+   
+   Edit `.env.local`:
+   ```
+   GROQ_API_KEY=your_groq_api_key_here
+   ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+   ELEVENLABS_VOICE_ID=your_voice_id_here
+   ```
+
+4. **Run development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open in browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 🎮 How to Use
+
+1. **Allow microphone access** when prompted
+2. **Tap the sphere** to start recording your voice
+3. **Speak your wellness question** or concern
+4. **Listen to the AI response** - the sphere will animate while speaking
+5. **Continue the conversation** by tapping the sphere again
+
+## 🏗️ Architecture
+
+### Frontend (`/app/page.tsx`)
+- Voice-only interface with animated sphere
+- Web Speech API for speech recognition
+- Audio playback with state management
+- Crisis keyword detection
+
+### API Routes
+- `/api/chat` - Groq streaming chat completions
+- `/api/tts` - ElevenLabs text-to-speech conversion
+
+### Components
+- `AnimatedSphere.tsx` - Framer Motion animated sphere
+- `VoiceWave.tsx` - Audio visualization bars (legacy)
+
+### Libraries Used
+- **Next.js 14** - React framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **Framer Motion** - Animations
+- **Groq SDK** - AI chat completions
+- **Zod** - API validation
+
+## 🔧 Configuration
+
+### System Prompt
+The AI uses a concise wellness-focused prompt:
+```
+"You are a supportive wellness companion. Give brief, kind replies (2-4 sentences). Focus on grounding and mindfulness. If crisis mentioned, urge emergency services."
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Response Optimization
+- **Max tokens**: 150 (for faster responses)
+- **Temperature**: 0.7 (balanced creativity/consistency)
+- **Early TTS**: Starts after 50 characters for perceived speed
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Crisis Keywords
+Client-side detection for: `suicide`, `kill myself`, `self-harm`, `end my life`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Deployment
 
-## Learn More
+### Build for production
+```bash
+npm run build
+npm run start
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Deploy to Vercel
+1. Connect your GitHub repository to Vercel
+2. Add environment variables in Vercel dashboard
+3. Deploy automatically on push to main
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🧪 Testing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run unit tests:
+```bash
+npm test
+```
 
-## Deploy on Vercel
+Tests include:
+- Crisis keyword detection
+- API validation
+- Response formatting
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📱 Mobile Support
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **iOS Safari** - Full voice support with autoplay handling
+- **Android Chrome** - Optimized touch interactions
+- **Responsive design** - Adapts to all screen sizes
+- **PWA ready** - Can be installed as app
+
+## 🔒 Privacy & Safety
+
+- **No data storage** - Conversations are not saved
+- **Crisis detection** - Automatic alerts for concerning keywords
+- **Emergency guidance** - Directs users to professional help when needed
+- **Disclaimer** - Clear messaging about prototype limitations
+
+## 🛠️ Development
+
+### Project Structure
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── chat/route.ts      # Groq streaming API
+│   │   └── tts/route.ts       # ElevenLabs TTS API
+│   ├── page.tsx               # Main voice interface
+│   └── layout.tsx             # App layout
+├── components/
+│   ├── AnimatedSphere.tsx     # Main sphere component
+│   └── VoiceWave.tsx          # Audio visualization
+└── lib/
+    ├── crisis-detector.ts     # Safety keyword detection
+    └── stream.ts              # SSE streaming utilities
+```
+
+### Key Features Implemented
+- ✅ Voice-only interface (no text chat)
+- ✅ ChatGPT-style animated sphere
+- ✅ Fast streaming responses
+- ✅ Early TTS for perceived speed
+- ✅ Mobile-optimized design
+- ✅ Crisis safety detection
+- ✅ Framer Motion animations
+- ✅ ElevenLabs voice synthesis
+- ✅ Groq AI integration
+
+## 📄 License
+
+MIT License - feel free to use for personal or commercial projects.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📞 Support
+
+For issues or questions:
+- Open a GitHub issue
+- Check the console for error messages
+- Ensure API keys are correctly configured
+
+---
+
+**Built with ❤️ for mental wellness and AI innovation**
