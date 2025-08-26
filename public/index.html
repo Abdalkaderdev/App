@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<title>Voice Bubble Prototype</title>
+	<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+	<div class="disclaimer">Prototype — not therapy. In crisis? Seek help.</div>
+	<main class="container">
+		<div id="sphere" class="sphere state-idle" aria-live="polite" aria-label="Assistant bubble">
+			<div class="voicewave" aria-hidden="true">
+				<div class="bar"></div>
+				<div class="bar"></div>
+				<div class="bar"></div>
+				<div class="bar"></div>
+				<div class="bar"></div>
+			</div>
+			<div class="spinner" aria-hidden="true"></div>
+			<div class="recording-indicator" aria-hidden="true">
+				<span class="dot"></span>
+				<span class="pulse"></span>
+			</div>
+			<div class="toast" role="alert"></div>
+		</div>
+		<button id="micBtn" class="mic-btn" aria-label="Start recording" aria-pressed="false">
+			<svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+				<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19.93V22h2v-2.07A8.001 8.001 0 0 0 20 12h-2a6 6 0 1 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/>
+			</svg>
+		</button>
+	</main>
+	<div id="disabledOverlay" class="disabled-overlay" hidden>
+		<div class="disabled-card">
+			<h2>Microphone disabled</h2>
+			<p>Please enable mic permissions in your browser settings to use this prototype.</p>
+			<button id="retryPerms" class="retry-btn">Try again</button>
+		</div>
+	</div>
+	<script src="/app.js" type="module"></script>
+</body>
+</html>
