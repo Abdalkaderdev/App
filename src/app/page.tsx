@@ -2,11 +2,57 @@
 
 import { useState } from "react";
 import VoiceWave from "../components/VoiceWave";
+import { listenOnce, speak } from "@/lib/speech";
 
 type Mode = "idle" | "listening" | "speaking";
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function requestMicPermission(): Promise<void> {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      throw new Error("Microphone permission denied");
+    }
+  }
+
+  async function handleMicClick() {
+    if (mode !== "idle") {
+      setMode("idle");
+      return;
+    }
+    setError(null);
+    setMode("listening");
+    try {
+      await requestMicPermission();
+      const { transcript } = await listenOnce({ lang: "en-US" });
+      const userText = transcript?.trim();
+      if (!userText) {
+        setMode("idle");
+        return;
+      }
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: userText }),
+      });
+      const data = (await res.json()) as { reply?: string };
+      const reply: string = data?.reply ?? "I am here and listening.";
+
+      setMode("speaking");
+      await speak(reply, { lang: "en-US", rate: 1.0, pitch: 1.0 });
+      setMode("idle");
+    } catch (err: unknown) {
+      const message =
+        (err as { message?: string } | null)?.message ?? "Microphone or speech is not available";
+      setError(message);
+      setMode("idle");
+    }
+  }
 
   return (
     <div className="min-h-screen p-8 pb-20 sm:p-20 grid place-items-center font-[family-name:var(--font-geist-sans)]">
@@ -20,7 +66,11 @@ export default function Home() {
           }
         >
           <p className="text-sm sm:text-base">
-            Hi! I can animate based on state: idle, listening, or speaking.
+            {mode === "listening"
+              ? "Listening..."
+              : mode === "speaking"
+                ? "Speaking..."
+                : "Hi! I can animate based on state: idle, listening, or speaking."}
           </p>
         </div>
 
@@ -36,11 +86,7 @@ export default function Home() {
             (mode === "listening" ? "animate-mic-listening " : "")
           }
           aria-label="Microphone"
-          onClick={() =>
-            setMode((prev) =>
-              prev === "idle" ? "listening" : prev === "listening" ? "speaking" : "idle",
-            )
-          }
+          onClick={handleMicClick}
         >
           {/* Mic icon */}
           <svg
@@ -84,6 +130,9 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
         {/* Docs link for E2E test */}
         <a href="/docs" className="text-sm underline">
           Read our docs
