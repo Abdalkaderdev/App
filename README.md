@@ -9,24 +9,28 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
 ## 🎯 Features
 
 ### Voice-Only Interface
+
 - **Tap-to-speak** - Click the animated sphere to start voice recording
 - **Speech-to-text** - Web Speech API converts voice to text
 - **Text-to-speech** - ElevenLabs generates natural voice responses
 - **No text display** - Pure voice conversation like ChatGPT mobile
 
 ### Animated Sphere
+
 - **ChatGPT-style animations** - Organic morphing sphere with Framer Motion
 - **State-based colors** - Gray (idle), Red (listening), Yellow (thinking), Blue (speaking)
 - **Particle effects** - Floating particles during voice activity
 - **Glow effects** - Dynamic outer glow that expands during activity
 
 ### AI Integration
+
 - **Groq API** - Fast streaming responses with llama-3.1-8b-instant
 - **ElevenLabs TTS** - High-quality voice synthesis
 - **Crisis detection** - Client-side keyword detection with safety alerts
 - **Optimized responses** - Early TTS start for faster perceived response times
 
 ### Mobile-First Design
+
 - **Responsive sphere** - Scales from 64x64 (mobile) to 80x80 (desktop)
 - **Touch-friendly** - Large clickable area with hover/press feedback
 - **Smooth audio** - Mobile Safari and Chrome compatible
@@ -35,6 +39,7 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - Groq API key ([console.groq.com](https://console.groq.com))
 - ElevenLabs API key ([elevenlabs.io](https://elevenlabs.io))
@@ -42,22 +47,26 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Abdalkaderdev/App.git
    cd App
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.local.example .env.local
    ```
-   
+
    Edit `.env.local`:
+
    ```
    GROQ_API_KEY=your_groq_api_key_here
    ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
@@ -65,6 +74,7 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
    ```
 
 4. **Run development server**
+
    ```bash
    npm run dev
    ```
@@ -83,20 +93,24 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
 ## 🏗️ Architecture
 
 ### Frontend (`/app/page.tsx`)
+
 - Voice-only interface with animated sphere
 - Web Speech API for speech recognition
 - Audio playback with state management
 - Crisis keyword detection
 
 ### API Routes
+
 - `/api/chat` - Groq streaming chat completions
 - `/api/tts` - ElevenLabs text-to-speech conversion
 
 ### Components
+
 - `AnimatedSphere.tsx` - Framer Motion animated sphere
 - `VoiceWave.tsx` - Audio visualization bars (legacy)
 
 ### Libraries Used
+
 - **Next.js 14** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
@@ -107,43 +121,64 @@ A Next.js 14 voice-only AI therapist prototype with ChatGPT-style animated spher
 ## 🔧 Configuration
 
 ### System Prompt
+
 The AI uses a concise wellness-focused prompt:
+
 ```
 "You are a supportive wellness companion. Give brief, kind replies (2-4 sentences). Focus on grounding and mindfulness. If crisis mentioned, urge emergency services."
 ```
 
 ### Response Optimization
+
 - **Max tokens**: 150 (for faster responses)
 - **Temperature**: 0.7 (balanced creativity/consistency)
 - **Early TTS**: Starts after 50 characters for perceived speed
 
 ### Crisis Keywords
+
 Client-side detection for: `suicide`, `kill myself`, `self-harm`, `end my life`
 
 ## 🚀 Deployment
 
 ### Build for production
+
 ```bash
 npm run build
 npm run start
 ```
 
 ### Deploy to Vercel
-1. Connect your GitHub repository to Vercel
-2. Add environment variables in Vercel dashboard
-3. Deploy automatically on push to main
+
+1. Push your repo to GitHub (public or private)
+2. Go to the Vercel dashboard and click "New Project"
+3. Import this repository and select it
+4. In "Environment Variables", add:
+   - `GROQ_API_KEY`
+   - `ELEVENLABS_API_KEY`
+   - `ELEVENLABS_VOICE_ID`
+5. Leave build settings as default (Framework Preset: Next.js)
+6. Click "Deploy"
+
+Notes:
+
+- A minimal `vercel.json` is included to map secrets; you can also manage env vars solely in Vercel and delete `vercel.json` if preferred.
+- For Preview Environments (PRs), add the same env vars under Preview scope.
+- After deploy, use "View Logs" in Vercel to troubleshoot any runtime issues.
 
 ## 🧪 Testing
 
 Run unit tests:
+
 ```bash
 npm test
 ```
 
-Tests include:
-- Crisis keyword detection
-- API validation
-- Response formatting
+Run E2E tests locally:
+
+```bash
+npx playwright install
+npm run test:e2e
+```
 
 ## 📱 Mobile Support
 
@@ -162,6 +197,7 @@ Tests include:
 ## 🛠️ Development
 
 ### Project Structure
+
 ```
 src/
 ├── app/
@@ -179,6 +215,7 @@ src/
 ```
 
 ### Key Features Implemented
+
 - ✅ Voice-only interface (no text chat)
 - ✅ ChatGPT-style animated sphere
 - ✅ Fast streaming responses
@@ -204,6 +241,7 @@ MIT License - feel free to use for personal or commercial projects.
 ## 📞 Support
 
 For issues or questions:
+
 - Open a GitHub issue
 - Check the console for error messages
 - Ensure API keys are correctly configured
