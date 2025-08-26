@@ -1,14 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import VoiceWave from "../components/VoiceWave";
 import { listenOnce, speak } from "@/lib/speech";
+import { recordOnce } from "@/lib/record";
 
 type Mode = "idle" | "listening" | "speaking";
+
+function isWebSpeechSupported(): boolean {
+  if (typeof window === "undefined") return false;
+  const w = window as Window & { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+  return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
+}
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("idle");
   const [error, setError] = useState<string | null>(null);
+  const webSpeechSupported = useMemo(isWebSpeechSupported, []);
 
   async function requestMicPermission(): Promise<void> {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
@@ -28,8 +36,24 @@ export default function Home() {
     setMode("listening");
     try {
       await requestMicPermission();
-      const { transcript } = await listenOnce({ lang: "en-US" });
-      const userText = transcript?.trim();
+
+      let userText = "";
+      if (webSpeechSupported) {
+        const { transcript } = await listenOnce({ lang: "en-US" });
+        userText = transcript?.trim();
+      } else {
+        // Record short audio and send to server STT
+        const { blob } = await recordOnce(4000);
+        const arrayBuffer = await blob.arrayBuffer();
+        const sttRes = await fetch("/api/stt", {
+          method: "POST",
+          headers: { "content-type": "application/octet-stream" },
+          body: arrayBuffer,
+        });
+        const sttData = (await sttRes.json()) as { text?: string };
+        userText = sttData?.text?.trim() ?? "";
+      }
+
       if (!userText) {
         setMode("idle");
         return;
@@ -44,7 +68,22 @@ export default function Home() {
       const reply: string = data?.reply ?? "I am here and listening.";
 
       setMode("speaking");
-      await speak(reply, { lang: "en-US", rate: 1.0, pitch: 1.0 });
+      if (webSpeechSupported) {
+        await speak(reply, { lang: "en-US", rate: 1.0, pitch: 1.0 });
+      } else {
+        const ttsRes = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text: reply }),
+        });
+        if (ttsRes.ok) {
+          const audioBuffer = await ttsRes.arrayBuffer();
+          const audio = new Audio(
+            URL.createObjectURL(new Blob([audioBuffer], { type: "audio/mpeg" })),
+          );
+          audio.play().catch(() => {});
+        }
+      }
       setMode("idle");
     } catch (err: unknown) {
       const message =
@@ -57,6 +96,22 @@ export default function Home() {
   return (
     <div className="min-h-screen p-8 pb-20 sm:p-20 grid place-items-center font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col items-center gap-8">
+        {!webSpeechSupported && (
+          <div className="rounded-md border border-foreground/10 bg-background/70 px-3 py-2 text-xs">
+            Web Speech API is not supported in this browser. Fallback is enabled. For the best
+            experience,{" "}
+            <a
+              className="underline"
+              href="https://www.google.com/chrome/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              try in Chrome
+            </a>
+            .
+          </div>
+        )}
+
         {/* Bubble */}
         <div
           className={

@@ -2,13 +2,21 @@ export type ListenResult = {
   transcript: string;
 };
 
+type RecognitionResultEvent = {
+  results?: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+type RecognitionErrorEvent = {
+  error?: string;
+};
+
 type WebSpeechRecognition = {
   lang: string;
   interimResults: boolean;
   maxAlternatives: number;
   continuous: boolean;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: RecognitionResultEvent) => void) | null;
+  onerror: ((event: RecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
   start: () => void;
 };
@@ -45,16 +53,15 @@ export async function listenOnce(options?: { lang?: string }): Promise<ListenRes
     };
 
     recognition.onresult = (event) => {
-      const first = event.results?.[0]?.[0] as SpeechRecognitionAlternative | undefined;
-      const transcript: string = first?.transcript ?? "";
+      const first =
+        (event.results?.[0]?.[0] as { transcript?: string } | undefined)?.transcript ?? "";
       cleanup();
-      resolve({ transcript });
+      resolve({ transcript: first });
     };
 
     recognition.onerror = (event) => {
       cleanup();
-      const detail = (event as Partial<SpeechRecognitionErrorEvent> & { error?: string })?.error;
-      reject(new Error(detail ?? "speech recognition error"));
+      reject(new Error(event?.error ?? "speech recognition error"));
     };
 
     recognition.onend = () => {
