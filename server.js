@@ -37,7 +37,7 @@ app.post('/api/chat', async (req, res) => {
 app.post('/api/tts', async (req, res) => {
 	try {
 		const apiKey = process.env.ELEVENLABS_API_KEY;
-		const voiceId = process.env.ELEVENLABS_VOICE_ID;
+		const voiceId = req.body?.voiceId ?? process.env.ELEVENLABS_VOICE_ID;
 		const text = req.body?.text ?? '';
 		if (!text) return res.status(400).json({ error: 'text is required' });
 		if (!apiKey || !voiceId) return res.status(500).json({ error: 'TTS not configured' });
