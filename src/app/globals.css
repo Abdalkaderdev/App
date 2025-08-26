@@ -89,4 +89,50 @@ body {
   .animate-shake-once {
     animation: shake 400ms ease-in-out 1;
   }
+  /* Gradient angle/position shift for shimmering effect */
+  @keyframes gradientShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  .animate-gradient-shift {
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease-in-out infinite;
+  }
+
+  /* Soft outer blue glow pulse for listening state */
+  @keyframes glowingPulse {
+    0%,
+    100% {
+      box-shadow: 0 0 40px 12px rgba(59, 130, 246, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 64px 20px rgba(37, 99, 235, 0.35);
+    }
+  }
+  .animate-glowing-pulse {
+    animation: glowingPulse 1.8s ease-in-out infinite;
+  }
+
+  /* Subtle inner wave motion for layered radial gradients */
+  @keyframes waveMotion {
+    0% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(6px, -4px);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  .animate-wave-motion {
+    animation: waveMotion 2.4s ease-in-out infinite;
+  }
 }
