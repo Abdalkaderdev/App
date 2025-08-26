@@ -1,101 +1,86 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import VoiceWave from "../components/VoiceWave";
+
+type Mode = "idle" | "listening" | "speaking";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+	const [mode, setMode] = useState<Mode>("idle");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+	return (
+		<div className="min-h-screen p-8 pb-20 sm:p-20 grid place-items-center font-[family-name:var(--font-geist-sans)]">
+			<main className="flex flex-col items-center gap-8">
+				{/* Bubble */}
+				<div
+					className={
+						`relative max-w-[28rem] rounded-3xl border border-foreground/10 bg-background/80 px-6 py-5 text-center shadow-sm will-change-transform ` +
+						(mode === "idle" ? "animate-bubble-idle " : "") +
+						(mode === "speaking" ? "scale-105 " : "")
+					}
+				>
+					<p className="text-sm sm:text-base">
+						Hi! I can animate based on state: idle, listening, or speaking.
+					</p>
+				</div>
+
+				{/* VoiceWave (visible when speaking) */}
+				<div className="h-10">
+					<VoiceWave active={mode === "speaking"} />
+				</div>
+
+				{/* Mic button */}
+				<button
+					className={
+						`relative flex h-16 w-16 items-center justify-center rounded-full bg-foreground text-background shadow will-change-transform ` +
+						(mode === "listening" ? "animate-mic-listening " : "")
+					}
+					aria-label="Microphone"
+					onClick={() => setMode((prev) => (prev === "idle" ? "listening" : prev === "listening" ? "speaking" : "idle"))}
+				>
+					{/* Mic icon */}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						className="h-7 w-7"
+						aria-hidden="true"
+					>
+						<path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" />
+						<path d="M5 11a1 1 0 1 0-2 0 9 9 0 0 0 8 8v2H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2a9 9 0 0 0 8-8 1 1 0 1 0-2 0 7 7 0 0 1-14 0z" />
+					</svg>
+
+					{/* Red dot indicator when listening */}
+					{mode === "listening" && (
+						<span className="absolute -top-1 -right-1 inline-block h-3 w-3 rounded-full bg-red-500 will-change-transform animate-red-dot" />
+					)}
+				</button>
+
+				{/* State controls for demo */}
+				<div className="flex items-center gap-2 text-xs">
+					<label className="opacity-70">State:</label>
+					<div className="flex rounded-lg border border-foreground/10 overflow-hidden">
+						<button
+							className={`px-3 py-1 ${mode === "idle" ? "bg-foreground text-background" : ""}`}
+							onClick={() => setMode("idle")}
+						>
+							Idle
+						</button>
+						<button
+							className={`px-3 py-1 ${mode === "listening" ? "bg-foreground text-background" : ""}`}
+							onClick={() => setMode("listening")}
+						>
+							Listening
+						</button>
+						<button
+							className={`px-3 py-1 ${mode === "speaking" ? "bg-foreground text-background" : ""}`}
+							onClick={() => setMode("speaking")}
+						>
+							Speaking
+						</button>
+					</div>
+				</div>
+			</main>
+		</div>
+	);
 }

@@ -24,4 +24,7 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  .will-change-transform {
+    will-change: transform;
+  }
 }
