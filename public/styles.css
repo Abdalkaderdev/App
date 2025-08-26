@@ -198,3 +198,12 @@ body {
 @media (min-width: 768px) {
 	.mic-btn { width: 92px; height: 92px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+	.sphere { animation: none !important; }
+	.voicewave .bar { animation: none !important; transform: scaleY(0.4) !important; }
+	.spinner { animation: none !important; }
+	.recording-indicator .dot { animation: none !important; }
+	.recording-indicator .pulse { animation: none !important; }
+	.mic-btn { transition: none !important; }
+}

@@ -481,3 +481,56 @@ bindPushToTalk();
 
 // Init
 setState(State.IDLE);
+
+// Haptics helper
+function haptic(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch {} }
+
+// iOS/Audio unlock
+let audioUnlocked = false;
+async function unlockAudio() {
+	try {
+		if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		await audioCtx.resume();
+		const o = audioCtx.createOscillator();
+		const g = audioCtx.createGain();
+		g.gain.value = 0.0001;
+		o.connect(g).connect(audioCtx.destination);
+		o.start(); o.stop(audioCtx.currentTime + 0.02);
+		audioUnlocked = true;
+	} catch {}
+}
+window.addEventListener('pointerdown', () => { if (!audioUnlocked) unlockAudio(); }, { passive: true });
+window.addEventListener('touchend', () => { if (!audioUnlocked) unlockAudio(); }, { passive: true });
+
+// Integrate haptics in state transitions
+const _setStateOrig = setState;
+setState = function(next) {
+	_setStateOrig(next);
+	if (next === State.LISTENING) haptic(8);
+	if (next === State.SPEAKING) haptic(6);
+	if (next === State.IDLE) haptic(2);
+};
+
+// Keyboard shortcuts: push-to-talk with Space
+let spaceDown = false;
+window.addEventListener('keydown', async (e) => {
+	if (e.key === ' ' && !spaceDown) {
+		spaceDown = true;
+		if (appState !== State.LISTENING) {
+			const stream = await requestMicPermission();
+			if (!stream) { setState(State.DISABLED); disabledOverlay.hidden = false; return; }
+			micStream = stream;
+			startListening();
+			vadWindow = [];
+			requestAnimationFrame(vadTick);
+		}
+		e.preventDefault();
+	}
+}, { passive: false });
+window.addEventListener('keyup', (e) => {
+	if (e.key === ' ' && spaceDown) {
+		spaceDown = false;
+		if (appState === State.LISTENING) stopListening();
+		e.preventDefault();
+	}
+}, { passive: false });
