@@ -168,20 +168,41 @@ async function handleTranscript(transcript) {
 		if (!chatRes.ok) throw new Error('chat failed');
 		const { text } = await chatRes.json();
 
-		// Call TTS endpoint (MVP stub)
-		await fetch('/api/tts', {
+		// Request ElevenLabs audio
+		const ttsRes = await fetch('/api/tts', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ text })
 		});
+		if (ttsRes.ok) {
+			const blob = await ttsRes.blob();
+			await playAudioBlob(blob).catch(async () => {
+				await speak(text); // fallback
+			});
+		} else {
+			await speak(text); // fallback
+		}
 
-		await speak(text);
 		setState(State.IDLE);
 	} catch (e) {
 		console.error('processing error', e);
 		setState(State.ERROR);
 		showToast('Error occurred. Tap mic to retry.');
 	}
+}
+
+function playAudioBlob(blob) {
+	return new Promise((resolve, reject) => {
+		try {
+			const url = URL.createObjectURL(blob);
+			const audio = new Audio();
+			audio.src = url;
+			audio.onplay = () => setState(State.SPEAKING);
+			audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+			audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+			audio.play().catch(reject);
+		} catch (e) { reject(e); }
+	});
 }
 
 function speak(text) {
@@ -193,15 +214,10 @@ function speak(text) {
 			utter.pitch = 1.0;
 			utter.onstart = () => setState(State.SPEAKING);
 			utter.onend = () => resolve();
-			utter.onerror = (e) => {
-				console.warn('TTS error', e);
-				resolve();
-			};
+			utter.onerror = (e) => { console.warn('TTS error', e); resolve(); };
 			window.speechSynthesis.cancel();
 			window.speechSynthesis.speak(utter);
-		} catch (e) {
-			reject(e);
-		}
+		} catch (e) { reject(e); }
 	});
 }
 

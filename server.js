@@ -1,6 +1,7 @@
 import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
+import { Readable } from 'node:stream';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,19 +33,43 @@ app.post('/api/chat', async (req, res) => {
 	}
 });
 
-// TTS stub: For MVP we let client use speechSynthesis; this endpoint acknowledges receipt
+// ElevenLabs TTS proxy: streams audio back to client
 app.post('/api/tts', async (req, res) => {
 	try {
+		const apiKey = process.env.ELEVENLABS_API_KEY;
+		const voiceId = process.env.ELEVENLABS_VOICE_ID;
 		const text = req.body?.text ?? '';
-		if (!text) {
-			return res.status(400).json({ error: 'text is required' });
+		if (!text) return res.status(400).json({ error: 'text is required' });
+		if (!apiKey || !voiceId) return res.status(500).json({ error: 'TTS not configured' });
+
+		const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?optimize_streaming_latency=3`;
+		const upstream = await fetch(url, {
+			method: 'POST',
+			headers: {
+				'xi-api-key': apiKey,
+				'Content-Type': 'application/json',
+				'Accept': 'audio/mpeg'
+			},
+			body: JSON.stringify({
+				text,
+				model_id: 'eleven_turbo_v2',
+				voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+			})
+		});
+
+		if (!upstream.ok || !upstream.body) {
+			let detail = '';
+			try { detail = await upstream.text(); } catch {}
+			return res.status(502).json({ error: 'Upstream TTS failed', detail });
 		}
-		// In a real impl, generate audio and stream it.
-		await new Promise(r => setTimeout(r, 100));
-		res.status(204).end();
+
+		res.setHeader('Content-Type', 'audio/mpeg');
+		res.setHeader('Cache-Control', 'no-store');
+		const stream = Readable.fromWeb(upstream.body);
+		stream.pipe(res);
 	} catch (err) {
 		console.error('POST /api/tts error', err);
-		res.status(500).json({ error: 'Server error' });
+		if (!res.headersSent) res.status(500).json({ error: 'Server error' });
 	}
 });
 
