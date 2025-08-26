@@ -53,6 +53,43 @@ app.post('/api/chat', async (req, res) => {
 	}
 });
 
+// SSE chat stream: streams reply sentence-by-sentence
+app.get('/api/chat/stream', async (req, res) => {
+	try {
+		const content = (req.query?.content || '').toString();
+		const base = content
+			? `I hear you. ${content}. Thank you for sharing that. Would you like to talk more about how that makes you feel right now?`
+			: 'Hello. I am here to listen. What is on your mind?';
+		const sentences = base.match(/[^.!?]+[.!?]?\s*/g) || [base];
+
+		res.setHeader('Content-Type', 'text/event-stream');
+		res.setHeader('Cache-Control', 'no-cache, no-transform');
+		res.setHeader('Connection', 'keep-alive');
+		res.flushHeaders?.();
+
+		let i = 0;
+		const interval = setInterval(() => {
+			if (i >= sentences.length) {
+				res.write(`event: done\n`);
+				res.write(`data: [DONE]\n\n`);
+				clearInterval(interval);
+				try { res.end(); } catch {}
+				return;
+			}
+			const chunk = sentences[i++];
+			res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+		}, 300);
+
+		req.on('close', () => {
+			clearInterval(interval);
+			try { res.end(); } catch {}
+		});
+	} catch (err) {
+		console.error('GET /api/chat/stream error', err);
+		if (!res.headersSent) res.status(500).json({ error: 'Server error' });
+	}
+});
+
 // ElevenLabs TTS proxy: streams audio back to client
 app.post('/api/tts', async (req, res) => {
 	try {

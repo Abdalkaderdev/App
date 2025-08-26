@@ -32,6 +32,35 @@ let audioSourceNode = null; // for playback element
 let rafId = null;
 const bars = Array.from(sphere.querySelectorAll('.voicewave .bar'));
 
+// SSE sentence queue
+let speakingQueue = [];
+let speaking = false;
+
+async function playQueue() {
+	if (speaking) return;
+	speaking = true;
+	while (speakingQueue.length > 0) {
+		const text = speakingQueue.shift();
+		try {
+			const ttsRes = await fetchWithTimeoutRetry('/api/tts', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ text })
+			}, { timeoutMs: 25000, retries: 1 });
+			if (ttsRes.ok) {
+				const blob = await ttsRes.blob();
+				await playAudioBlob(blob).catch(async () => { await speak(text); });
+			} else {
+				await speak(text);
+			}
+		} catch {
+			await speak(text);
+		}
+	}
+	speaking = false;
+	setState(State.IDLE);
+}
+
 function startAnalyserFromStream(stream) {
 	try {
 		if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -254,51 +283,120 @@ function stopListening() {
 	}
 }
 
-async function handleTranscript(transcript) {
+async function handleTranscriptStreaming(transcript) {
 	const trimmed = (transcript || '').trim();
-	if (!trimmed) {
-		setState(State.IDLE);
-		showToast('Heard nothing. Tap mic to try again.');
-		return;
+	if (!trimmed) { setState(State.IDLE); showToast('Heard nothing. Tap mic to try again.'); return; }
+	if (crisisKeywordCheck(trimmed)) { alert('If you are in crisis or considering self-harm, please seek immediate help from local emergency services or a trusted person. You are not alone.'); }
+	setState(State.PROCESSING);
+	abortInFlight();
+	try {
+		const url = `/api/chat/stream?` + new URLSearchParams({ content: trimmed });
+		const res = await fetchWithTimeoutRetry(url, { method: 'GET' }, { timeoutMs: 30000, retries: 0 });
+		if (!res.ok || !res.body) throw new Error('sse failed');
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder('utf-8');
+		let buffer = '';
+		while (true) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			let idx;
+			while ((idx = buffer.indexOf('\n\n')) >= 0) {
+				const frame = buffer.slice(0, idx);
+				buffer = buffer.slice(idx + 2);
+				const line = frame.split('\n').find(l => l.startsWith('data: '));
+				if (!line) continue;
+				const json = line.replace('data: ', '');
+				if (json === '[DONE]') break;
+				try {
+					const payload = JSON.parse(json);
+					const textChunk = (payload?.text || '').trim();
+					if (textChunk) { speakingQueue.push(textChunk); }
+				} catch {}
+			}
+		}
+		if (speakingQueue.length > 0) {
+			await playQueue();
+		} else {
+			setState(State.IDLE);
+		}
+	} catch (e) {
+		console.error('streaming error', e);
+		setState(State.ERROR);
+		showToast('Error occurred. Tap mic to retry.');
 	}
+}
 
-	if (crisisKeywordCheck(trimmed)) {
-		alert('If you are in crisis or considering self-harm, please seek immediate help from local emergency services or a trusted person. You are not alone.');
+// Simple VAD using RMS threshold over window; stops rec on silence
+let vadWindow = [];
+const VAD_MAX = 12;
+const VAD_SILENCE_THRESHOLD = 0.03; // tune
+const VAD_SILENCE_FRAMES = 8;
+
+function vadTick() {
+	if (!analyser || appState !== State.LISTENING) return;
+	analyser.getByteTimeDomainData(dataArray);
+	let sum = 0;
+	for (let i = 0; i < dataArray.length; i++) {
+		const v = (dataArray[i] - 128) / 128; sum += v * v;
 	}
+	const rms = Math.sqrt(sum / dataArray.length);
+	vadWindow.push(rms);
+	if (vadWindow.length > VAD_MAX) vadWindow.shift();
+	const recent = vadWindow.slice(-VAD_SILENCE_FRAMES);
+	const avg = recent.reduce((a,b)=>a+b,0) / Math.max(1, recent.length);
+	if (avg < VAD_SILENCE_THRESHOLD) {
+		stopListening();
+	}
+	requestAnimationFrame(vadTick);
+}
 
+// Wire push-to-talk (press and hold)
+let pttActive = false;
+function bindPushToTalk() {
+	const start = async () => {
+		pttActive = true;
+		const stream = await requestMicPermission();
+		if (!stream) { setState(State.DISABLED); disabledOverlay.hidden = false; return; }
+		micStream = stream;
+		startListening();
+		vadWindow = [];
+		requestAnimationFrame(vadTick);
+	};
+	const end = () => {
+		pttActive = false;
+		stopListening();
+	};
+	micBtn.addEventListener('pointerdown', start);
+	micBtn.addEventListener('pointerup', end);
+	micBtn.addEventListener('pointerleave', () => { if (pttActive) end(); });
+}
+
+// Override result handler to choose streaming or non-streaming flow
+async function handleTranscript(transcript) {
+	if (USE_STREAMING) return handleTranscriptStreaming(transcript);
+	// fallback non-streaming path
+	const trimmed = (transcript || '').trim();
+	if (!trimmed) { setState(State.IDLE); showToast('Heard nothing. Tap mic to try again.'); return; }
+	if (crisisKeywordCheck(trimmed)) { alert('If you are in crisis or considering self-harm, please seek immediate help from local emergency services or a trusted person. You are not alone.'); }
 	setState(State.PROCESSING);
 	abortInFlight();
 	try {
 		chatAbort = new AbortController();
 		const chatRes = await fetchWithTimeoutRetry('/api/chat', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ messages: [{ role: 'user', content: trimmed }] }),
-			signal: chatAbort.signal
+			method: 'POST', headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ messages: [{ role: 'user', content: trimmed }] }), signal: chatAbort.signal
 		}, { timeoutMs: 15000, retries: 1 });
 		if (!chatRes.ok) throw new Error('chat failed');
 		const { text } = await chatRes.json();
-
 		ttsAbort = new AbortController();
 		const ttsRes = await fetchWithTimeoutRetry('/api/tts', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text })
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text })
 		}, { timeoutMs: 20000, retries: 1 });
-		if (ttsRes.ok) {
-			const blob = await ttsRes.blob();
-			await playAudioBlob(blob).catch(async () => { await speak(text); });
-			// start analyser on playback element
-			// Note: playAudioBlob creates a new Audio() instance; hook analyser via last created
-		} else {
-			await speak(text);
-		}
-
+		if (ttsRes.ok) { const blob = await ttsRes.blob(); await playAudioBlob(blob).catch(async () => { await speak(text); }); } else { await speak(text); }
 		setState(State.IDLE);
 	} catch (e) {
-		console.error('processing error', e);
-		setState(State.ERROR);
-		showToast('Error occurred. Tap mic to retry.');
+		console.error('processing error', e); setState(State.ERROR); showToast('Error occurred. Tap mic to retry.');
 	}
 }
 
@@ -374,6 +472,12 @@ if ('serviceWorker' in navigator) {
 		navigator.serviceWorker.register('/sw.js').catch(() => {});
 	});
 }
+
+// Toggle streaming mode here; for demo we use streaming
+const USE_STREAMING = true;
+
+// Bind push-to-talk
+bindPushToTalk();
 
 // Init
 setState(State.IDLE);
