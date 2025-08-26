@@ -19,6 +19,78 @@ let recognitionActive = false;
 let recognitionTimeoutId = null;
 const MAX_RECORD_MS = 30_000;
 
+// Abort controllers for in-flight requests
+let chatAbort = null;
+let ttsAbort = null;
+
+// WebAudio analyser for voicewave
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
+let micStream = null;
+let audioSourceNode = null; // for playback element
+let rafId = null;
+const bars = Array.from(sphere.querySelectorAll('.voicewave .bar'));
+
+function startAnalyserFromStream(stream) {
+	try {
+		if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		analyser = audioCtx.createAnalyser();
+		analyser.fftSize = 256;
+		const bufferLength = analyser.frequencyBinCount;
+		dataArray = new Uint8Array(bufferLength);
+		const source = audioCtx.createMediaStreamSource(stream);
+		source.connect(analyser);
+		loopVisual();
+	} catch (e) { console.warn('analyser init error', e); }
+}
+
+function startAnalyserFromAudio(el) {
+	try {
+		if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		analyser = audioCtx.createAnalyser();
+		analyser.fftSize = 256;
+		const bufferLength = analyser.frequencyBinCount;
+		dataArray = new Uint8Array(bufferLength);
+		if (audioSourceNode) audioSourceNode.disconnect();
+		audioSourceNode = audioCtx.createMediaElementSource(el);
+		audioSourceNode.connect(analyser);
+		analyser.connect(audioCtx.destination);
+		loopVisual();
+	} catch (e) { console.warn('audio analyser init error', e); }
+}
+
+function stopAnalyser() {
+	try { if (rafId) cancelAnimationFrame(rafId); } catch {}
+	rafId = null;
+	try { if (analyser) analyser.disconnect(); } catch {}
+	try { if (audioSourceNode) audioSourceNode.disconnect(); } catch {}
+}
+
+function loopVisual() {
+	if (!analyser) return;
+	analyser.getByteTimeDomainData(dataArray);
+	// Compute RMS
+	let sum = 0;
+	for (let i = 0; i < dataArray.length; i++) {
+		const v = (dataArray[i] - 128) / 128;
+		sum += v * v;
+	}
+	const rms = Math.sqrt(sum / dataArray.length); // 0..1
+	const base = Math.max(0.2, Math.min(1, rms * 3));
+	for (let i = 0; i < bars.length; i++) {
+		const jitter = 0.85 + Math.random() * 0.3;
+		const scale = Math.max(0.25, Math.min(1, base * (0.8 + i * 0.05) * jitter));
+		bars[i].style.transform = `scaleY(${scale})`;
+	}
+	rafId = requestAnimationFrame(loopVisual);
+}
+
+function cleanupMicStream() {
+	try { if (micStream) micStream.getTracks().forEach(t => t.stop()); } catch {}
+	micStream = null;
+}
+
 function setState(next) {
 	appState = next;
 	sphere.classList.remove('state-idle','state-listening','state-processing','state-speaking');
@@ -27,6 +99,8 @@ function setState(next) {
 			sphere.classList.add('state-idle');
 			micBtn.disabled = false;
 			micBtn.setAttribute('aria-pressed', 'false');
+			stopAnalyser();
+			cleanupMicStream();
 			break;
 		case State.LISTENING:
 			sphere.classList.add('state-listening');
@@ -78,13 +152,39 @@ function initRecognition() {
 }
 
 async function requestMicPermission() {
-	// Best-effort: getUserMedia for permission prompt
 	try {
-		await navigator.mediaDevices.getUserMedia({ audio: true });
-		return true;
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		return stream;
 	} catch (e) {
-		return false;
+		return null;
 	}
+}
+
+function abortInFlight() {
+	try { if (chatAbort) chatAbort.abort(); } catch {}
+	try { if (ttsAbort) ttsAbort.abort(); } catch {}
+}
+
+function fetchWithTimeoutRetry(url, opts = {}, { timeoutMs = 15000, retries = 1 } = {}) {
+	return new Promise((resolve, reject) => {
+		const attempt = (n) => {
+			const ac = new AbortController();
+			const timer = setTimeout(() => ac.abort(), timeoutMs);
+			const merged = { ...opts, signal: ac.signal };
+			fetch(url, merged).then(r => {
+				clearTimeout(timer);
+				resolve(r);
+			}).catch(err => {
+				clearTimeout(timer);
+				if (n < retries && (err.name === 'AbortError' || err.name === 'TypeError')) {
+					setTimeout(() => attempt(n + 1), 300);
+				} else {
+					reject(err);
+				}
+			});
+		};
+		attempt(0);
+	});
 }
 
 function startListening() {
@@ -98,9 +198,17 @@ function startListening() {
 	}
 
 	try {
-		recognition.onstart = () => {
+		recognition.onstart = async () => {
 			recognitionActive = true;
 			setState(State.LISTENING);
+			// Start mic analyser
+			try {
+				if (!micStream) {
+					const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+					micStream = stream;
+				}
+				startAnalyserFromStream(micStream);
+			} catch {}
 			// safety stop after MAX_RECORD_MS
 			recognitionTimeoutId = setTimeout(() => {
 				stopListening();
@@ -159,28 +267,31 @@ async function handleTranscript(transcript) {
 	}
 
 	setState(State.PROCESSING);
+	abortInFlight();
 	try {
-		const chatRes = await fetch('/api/chat', {
+		chatAbort = new AbortController();
+		const chatRes = await fetchWithTimeoutRetry('/api/chat', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ messages: [{ role: 'user', content: trimmed }] })
-		});
+			body: JSON.stringify({ messages: [{ role: 'user', content: trimmed }] }),
+			signal: chatAbort.signal
+		}, { timeoutMs: 15000, retries: 1 });
 		if (!chatRes.ok) throw new Error('chat failed');
 		const { text } = await chatRes.json();
 
-		// Request ElevenLabs audio
-		const ttsRes = await fetch('/api/tts', {
+		ttsAbort = new AbortController();
+		const ttsRes = await fetchWithTimeoutRetry('/api/tts', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ text })
-		});
+		}, { timeoutMs: 20000, retries: 1 });
 		if (ttsRes.ok) {
 			const blob = await ttsRes.blob();
-			await playAudioBlob(blob).catch(async () => {
-				await speak(text); // fallback
-			});
+			await playAudioBlob(blob).catch(async () => { await speak(text); });
+			// start analyser on playback element
+			// Note: playAudioBlob creates a new Audio() instance; hook analyser via last created
 		} else {
-			await speak(text); // fallback
+			await speak(text);
 		}
 
 		setState(State.IDLE);
@@ -197,7 +308,10 @@ function playAudioBlob(blob) {
 			const url = URL.createObjectURL(blob);
 			const audio = new Audio();
 			audio.src = url;
-			audio.onplay = () => setState(State.SPEAKING);
+			audio.onplay = () => {
+				setState(State.SPEAKING);
+				try { startAnalyserFromAudio(audio); } catch {}
+			};
 			audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
 			audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
 			audio.play().catch(reject);
@@ -212,7 +326,13 @@ function speak(text) {
 			utter.lang = 'en-US';
 			utter.rate = 1.0;
 			utter.pitch = 1.0;
-			utter.onstart = () => setState(State.SPEAKING);
+			utter.onstart = () => {
+				setState(State.SPEAKING);
+				try {
+					if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+					// We cannot analyser speechSynthesis directly; keep visual animation passive
+				} catch {}
+			};
 			utter.onend = () => resolve();
 			utter.onerror = (e) => { console.warn('TTS error', e); resolve(); };
 			window.speechSynthesis.cancel();
@@ -222,24 +342,38 @@ function speak(text) {
 }
 
 micBtn.addEventListener('click', async () => {
-	if (appState === State.SPEAKING) return;
+	if (appState === State.SPEAKING) {
+		// cancel playback and requests
+		abortInFlight();
+		try { stopAnalyser(); } catch {}
+		setState(State.IDLE);
+		return;
+	}
 	if (appState === State.LISTENING) { stopListening(); return; }
-	const granted = await requestMicPermission();
-	if (!granted) {
+	const stream = await requestMicPermission();
+	if (!stream) {
 		setState(State.DISABLED);
 		disabledOverlay.hidden = false;
 		return;
 	}
+	micStream = stream;
 	startListening();
 });
 
 retryPermsBtn.addEventListener('click', async () => {
-	const granted = await requestMicPermission();
-	if (granted) {
+	const stream = await requestMicPermission();
+	if (stream) {
 		disabledOverlay.hidden = true;
 		setState(State.IDLE);
 	}
 });
+
+// PWA: register service worker
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+		navigator.serviceWorker.register('/sw.js').catch(() => {});
+	});
+}
 
 // Init
 setState(State.IDLE);

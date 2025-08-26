@@ -1,14 +1,36 @@
 import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { Readable } from 'node:stream';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Security headers
+app.use(helmet({
+	crossOriginResourcePolicy: { policy: 'same-origin' },
+	contentSecurityPolicy: false,
+}));
+
+// JSON + compression
 app.use(compression());
 app.use(express.json({ limit: '2mb' }));
+
+// CORS: allow only configured origin if provided; otherwise same-origin only
+if (process.env.CORS_ORIGIN) {
+	app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: false }));
+}
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	limit: 60,
+	standardHeaders: true,
+	legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
 
 // Healthcheck
 app.get('/healthz', (_req, res) => {
@@ -20,11 +42,9 @@ app.post('/api/chat', async (req, res) => {
 	try {
 		const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
 		const userMsg = messages.find(m => m?.role === 'user')?.content ?? '';
-		// Simple, friendly reflective response
 		const reply = userMsg
 			? `I hear you. ${userMsg}. Thank you for sharing that. Would you like to talk more about how that makes you feel right now?`
 			: 'Hello. I am here to listen. What is on your mind?';
-		// Simulate minimal processing latency
 		await new Promise(r => setTimeout(r, 400));
 		res.status(200).json({ text: reply });
 	} catch (err) {
@@ -73,6 +93,7 @@ app.post('/api/tts', async (req, res) => {
 	}
 });
 
+// Static files
 app.use(express.static('public', { index: 'index.html' }));
 
 app.listen(PORT, () => {
